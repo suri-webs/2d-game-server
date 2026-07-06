@@ -4,3 +4,7 @@
 # Environment files
 **/.env
 **/.env.*
+
+# Build folders
+**/dist/
+**/build/
