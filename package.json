@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
+    "postinstall": "chmod -R +x node_modules/.bin 2>/dev/null || true",
     "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
     "build": "npx prisma generate && npx tsc",
     "start": "node dist/server.js",
