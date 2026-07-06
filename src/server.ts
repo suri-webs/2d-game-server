@@ -186,6 +186,17 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
+  // 6c. Capture client enemy damage updates and route to room host
+  socket.on('enemyDamage', ({ enemyId, damage }) => {
+    const room = roomsManager.getRoomByPlayerId(playerId);
+    if (room && room.hostId) {
+      const hostMember = room.members.get(room.hostId);
+      if (hostMember && hostMember.socketId) {
+        io.to(hostMember.socketId).emit('applyEnemyDamage', { enemyId, damage });
+      }
+    }
+  });
+
   // 7. Chat messages in lobbies / matches
   socket.on('sendChatMessage', ({ code, message }) => {
     io.to(code).emit('chatMessage', {

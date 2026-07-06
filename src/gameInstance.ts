@@ -76,10 +76,13 @@ export class GameInstance {
     ]
   };
 
-  constructor(roomId: string, mode: 'coop' | 'pvp', level: number, broadcastCallback: (state: GameState) => void) {
+  public hostId: string;
+
+  constructor(roomId: string, mode: 'coop' | 'pvp', level: number, hostId: string, broadcastCallback: (state: GameState) => void) {
     this.roomId = roomId;
     this.mode = mode;
     this.level = level;
+    this.hostId = hostId;
     this.broadcastCallback = broadcastCallback;
 
     // Load level specific wave layouts
@@ -90,7 +93,7 @@ export class GameInstance {
     // Replicate level waves based on level index
     const lvl = this.level;
     const waves: { type: string; count: number }[] = [];
-    
+
     if (lvl === 1) {
       waves.push({ type: 'skeleton_white', count: 3 }, { type: 'flying', count: 3 }, { type: 'boss', count: 1 });
     } else if (lvl === 2) {
@@ -139,8 +142,8 @@ export class GameInstance {
     }
 
     const groundY = CANVAS_HEIGHT - this.levelConfig.groundMargin;
-    const startX = this.mode === 'pvp' 
-      ? [100, 500, 900, 1300][this.players.size % 4] 
+    const startX = this.mode === 'pvp'
+      ? [100, 500, 900, 1300][this.players.size % 4]
       : 100 + this.players.size * 50;
 
     const player: ServerPlayer = {
@@ -226,6 +229,22 @@ export class GameInstance {
       p.coins = state.coins;
       p.shieldActive = state.shieldActive;
       p.isDead = state.isDead;
+    }
+    if (playerId === this.hostId) {
+      if (state.enemies) {
+        this.enemies = state.enemies;
+      }
+      if (state.waveIndex !== undefined) this.waveIndex = state.waveIndex;
+      if (state.waveSpawnedCount !== undefined) this.waveSpawnedCount = state.waveSpawnedCount;
+      if (state.waveComplete !== undefined) this.waveComplete = state.waveComplete;
+      if (state.portalSpawned !== undefined) {
+        this.portalSpawned = state.portalSpawned;
+        if (state.portalSpawned && state.portalX !== undefined) {
+          this.portal = { x: state.portalX, y: state.portalY, active: true };
+        } else {
+          this.portal = null;
+        }
+      }
     }
   }
 
@@ -329,14 +348,14 @@ export class GameInstance {
         p.animState = 'ATTACK';
         p.attackCooldown = 400; // 400ms speed
         p.inputs.attack1 = false;
-        
+
         // Attack hit confirmation
         this.resolveMeleeAttack(p);
       }
 
       // Interactive Dropbox proximity check
       if (p.inputs.interact && this.dropbox && this.dropbox.state === 'closed') {
-        const dist = Math.abs((p.x + p.width/2) - this.dropbox.x);
+        const dist = Math.abs((p.x + p.width / 2) - this.dropbox.x);
         if (dist < 100) {
           this.dropbox.state = 'opening';
           // Wait 500ms then open and spawn rewards
@@ -363,7 +382,7 @@ export class GameInstance {
         if (e.hp <= 0) return;
         const exCenter = e.x + e.width / 2;
         const eyCenter = e.y + e.height / 2;
-        
+
         const dist = Math.hypot(axCenter - exCenter, ayCenter - eyCenter);
         if (dist <= attackRange) {
           // Verify direction
@@ -374,7 +393,7 @@ export class GameInstance {
             if (e.hp <= 0) {
               e.state = 'dead';
               // spawn coins
-              this.spawnCoins(e.x + e.width/2, e.y + e.height/2, e.isBoss ? 20 : 3);
+              this.spawnCoins(e.x + e.width / 2, e.y + e.height / 2, e.isBoss ? 20 : 3);
               attacker.score += e.isBoss ? 100 : 10;
             }
           }
@@ -492,7 +511,7 @@ export class GameInstance {
   private spawnEnemy(type: string) {
     const id = Math.random().toString();
     const groundY = CANVAS_HEIGHT - this.levelConfig.groundMargin;
-    
+
     let hp = 40;
     let width = 60;
     let height = 80;
@@ -551,13 +570,13 @@ export class GameInstance {
         const tp: ServerPlayer = targetPlayer;
         const toRight = tp.x > e.x;
         e.facingLeft = !toRight;
-        
+
         // Attack range
         const attackRange = e.isBoss ? 120 : 60;
         if (minDist <= attackRange) {
           e.vx = 0;
           e.state = 'atk';
-          
+
           e.attackTimer += TIME_STEP * 1000;
           if (e.attackTimer >= e.attackInterval) {
             e.attackTimer = 0;
@@ -623,7 +642,7 @@ export class GameInstance {
       if (c.phase === 1 || c.phase === 2) {
         this.players.forEach(p => {
           if (p.isDead) return;
-          const dist = Math.hypot(p.x + p.width/2 - c.x, p.y + p.height/2 - c.y);
+          const dist = Math.hypot(p.x + p.width / 2 - c.x, p.y + p.height / 2 - c.y);
           if (dist < 80) {
             c.phase = 3;
             p.coins += c.value;
@@ -651,7 +670,7 @@ export class GameInstance {
             p.x = -9999; // mark for delete
             if (e.hp <= 0) {
               e.state = 'dead';
-              this.spawnCoins(e.x + e.width/2, e.y + e.height/2, e.isBoss ? 20 : 3);
+              this.spawnCoins(e.x + e.width / 2, e.y + e.height / 2, e.isBoss ? 20 : 3);
               const owner = this.players.get(p.ownerId);
               if (owner) owner.score += e.isBoss ? 100 : 10;
             }
@@ -684,7 +703,7 @@ export class GameInstance {
         if (l.pickedUp) return;
         this.players.forEach(p => {
           if (p.isDead) return;
-          const dist = Math.hypot(p.x + p.width/2 - l.x, p.y + p.height/2 - l.y);
+          const dist = Math.hypot(p.x + p.width / 2 - l.x, p.y + p.height / 2 - l.y);
           if (dist < 60) {
             l.pickedUp = true;
             if (l.type === 'weapon') {
@@ -710,7 +729,7 @@ export class GameInstance {
       if (this.portal) {
         this.players.forEach(p => {
           if (p.isDead) return;
-          const dist = Math.abs((p.x + p.width/2) - this.portal!.x);
+          const dist = Math.abs((p.x + p.width / 2) - this.portal!.x);
           if (dist < 80) {
             // Level cleared!
             this.saveProgress();
@@ -803,7 +822,9 @@ export class GameInstance {
         maxHp: e.maxHp,
         facingLeft: e.facingLeft,
         state: e.state,
-        isBoss: e.isBoss
+        isBoss: e.isBoss,
+        projectiles: (e as any).projectiles,
+        attackType: (e as any).attackType
       })),
       projectiles: this.projectiles,
       dropbox: this.dropbox,

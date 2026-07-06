@@ -146,7 +146,7 @@ export class RoomsManager {
     if (room.status !== 'lobby') return 'Game already started.';
 
     room.status = 'playing';
-    room.gameInstance = new GameInstance(code, room.mode, room.level, broadcastCallback);
+    room.gameInstance = new GameInstance(code, room.mode, room.level, room.hostId, broadcastCallback);
     
     // Populate players on start
     room.members.forEach(m => {
