@@ -187,13 +187,13 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 6c. Capture client enemy damage updates and route to room host
-  socket.on('enemyDamage', ({ enemyId, damage }) => {
+  socket.on('enemyDamage', ({ enemyId, damage, damageId }) => {
     const room = roomsManager.getRoomByPlayerId(playerId);
     if (room && room.hostId) {
       const hostMember = room.members.get(room.hostId);
       if (hostMember && hostMember.socketId) {
         console.log(`Damage relayed from guest ${username} (${playerId}) to host for enemy ${enemyId}: ${damage}`);
-        io.to(hostMember.socketId).emit('applyEnemyDamage', { enemyId, damage });
+        io.to(hostMember.socketId).emit('applyEnemyDamage', { enemyId, damage, damageId });
       } else {
         console.log(`Failed to relay damage: host member or socketId not found in room.`);
       }
