@@ -1,4 +1,4 @@
-import { GameServer } from './gameInstance';
+import { GameInstance } from './gameInstance';
 
 export interface RoomMember {
   playerId: string;
@@ -15,7 +15,7 @@ export interface Room {
   level: number;
   hostId: string;
   members: Map<string, RoomMember>;
-  gameInstance?: GameServer;
+  gameInstance?: GameInstance;
   status: 'lobby' | 'playing' | 'ended';
 }
 
@@ -146,7 +146,7 @@ export class RoomsManager {
     if (room.status !== 'lobby') return 'Game already started.';
 
     room.status = 'playing';
-    room.gameInstance = new GameServer(code, room.mode, room.level, room.hostId, broadcastCallback);
+    room.gameInstance = new GameInstance(code, room.mode, room.level, room.hostId, broadcastCallback);
     
     // Populate players on start
     room.members.forEach(m => {

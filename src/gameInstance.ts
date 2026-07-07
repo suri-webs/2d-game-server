@@ -34,7 +34,7 @@ interface ServerEnemy extends EnemyState {
   attackInterval: number;
 }
 
-export class GameServer {
+export class GameInstance {
   private roomId: string;
   private mode: 'coop' | 'pvp';
   private level: number;
@@ -239,8 +239,22 @@ export class GameServer {
       if (state.windProjectiles !== undefined) p.windProjectiles = state.windProjectiles;
     }
     if (playerId === this.hostId) {
+      if (state.enemies) {
+        this.enemies = state.enemies;
+      }
+      if (state.waveIndex !== undefined) this.waveIndex = state.waveIndex;
+      if (state.waveSpawnedCount !== undefined) this.waveSpawnedCount = state.waveSpawnedCount;
+      if (state.waveComplete !== undefined) this.waveComplete = state.waveComplete;
       if (state.cameraX !== undefined) this.cameraX = state.cameraX;
       if (state.scrollSpeed !== undefined) this.scrollSpeed = state.scrollSpeed;
+      if (state.portalSpawned !== undefined) {
+        this.portalSpawned = state.portalSpawned;
+        if (state.portalSpawned && state.portalX !== undefined) {
+          this.portal = { x: state.portalX, y: state.portalY, active: true };
+        } else {
+          this.portal = null;
+        }
+      }
     }
   }
 
@@ -257,36 +271,8 @@ export class GameServer {
     }
   }
 
-  public handleEnemyHit(enemyId: string, damage: number, playerId: string) {
-    const enemy = this.enemies.find(e => String(e.id) === String(enemyId));
-    if (enemy && enemy.hp > 0) {
-      enemy.hp = Math.max(0, enemy.hp - damage);
-      enemy.state = enemy.hp <= 0 ? 'dead' : 'hurt';
-
-      if (enemy.hp <= 0) {
-        this.spawnCoins(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.isBoss ? 20 : 3);
-        const attacker = this.players.get(playerId);
-        if (attacker) {
-          attacker.score += enemy.isBoss ? 100 : 10;
-        }
-      }
-      
-      // Snappy state broadcast
-      this.broadcastCallback(this.getState());
-    }
-  }
-
   private tick() {
-    if (this.status !== 'active') return;
-
-    this.updateWaves();
-    this.updateEnemies();
-    this.updateProjectiles();
-    this.updateDropbox();
-    this.updateCoins();
-    this.checkCollisions();
-    this.checkEndConditions();
-
+    // Client-authoritative coordination relay: only broadcast player states
     this.broadcastCallback(this.getState());
   }
 
@@ -549,115 +535,23 @@ export class GameServer {
     const id = Math.random().toString();
     const groundY = CANVAS_HEIGHT - this.levelConfig.groundMargin;
 
-    let actualType = type;
-    if (type === 'mixed_level1') {
-      actualType = Math.random() < 0.6 ? 'skeleton_white' : 'flying';
-    } else if (type === 'mixed_level2') {
-      const r = Math.random();
-      actualType = r < 0.4 ? 'demon' : (r < 0.75 ? 'skeleton_yellow' : 'flying');
-    } else if (type === 'mixed_level3') {
-      const r = Math.random();
-      actualType = r < 0.3 ? 'demon' : (r < 0.55 ? 'skeleton_yellow' : (r < 0.8 ? 'arcane_archer' : 'flying'));
-    }
-
-    const lvl = this.level;
     let hp = 40;
     let width = 60;
     let height = 80;
     let isBoss = false;
 
-    if (actualType === 'skeleton_white') {
-      hp = 40 + (lvl - 1) * 15;
-      width = 100;
-      height = 120;
-    } else if (actualType === 'skeleton_yellow') {
-      hp = 70 + (lvl - 1) * 20;
-      width = 100;
-      height = 120;
-    } else if (actualType === 'arcane_archer') {
-      hp = 50 + (lvl - 1) * 18;
-      width = 90;
-      height = 120;
-    } else if (actualType === 'demon') {
-      hp = 60 + (lvl - 1) * 25;
-      width = 200;
+    if (type === 'boss') {
+      hp = 300;
+      width = 150;
       height = 180;
-    } else if (actualType === 'flying') {
-      hp = 40;
-      width = 82;
-      height = 82;
-    } else if (actualType === 'boss') {
-      const lvlMod = this.level % 10 || 10;
       isBoss = true;
-      if (lvlMod === 10) {
-        actualType = 'amarjeet';
-        hp = 3000;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 9) {
-        actualType = 'abyss_knight';
-        hp = 1200;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 8) {
-        actualType = 'frost_wyrm';
-        hp = 900;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 7) {
-        actualType = 'storm_seraph';
-        hp = 750;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 6) {
-        actualType = 'crystal_titan';
-        hp = 600;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 5) {
-        actualType = 'impaler';
-        hp = 500;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 4) {
-        actualType = 'minoboss';
-        hp = 400;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 3) {
-        actualType = 'demon_lord';
-        hp = 400;
-        width = 320;
-        height = 320;
-      } else if (lvlMod === 2) {
-        actualType = 'mecha_stone';
-        hp = 450;
-        width = 320;
-        height = 320;
-      } else {
-        actualType = 'boss_level_1';
-        hp = 400;
-        width = 320;
-        height = 320;
-      }
-    }
-
-    let enemyY = groundY - height;
-    if (actualType === 'flying') {
-      enemyY = 200 + Math.random() * 170;
-    } else if (actualType === 'arcane_archer') {
-      enemyY = groundY - height + 32;
-    } else if (actualType === 'minoboss') {
-      enemyY = groundY - height + 37;
-    } else if (isBoss) {
-      enemyY = groundY - height + 10;
     }
 
     const enemy: ServerEnemy = {
       id,
-      type: actualType,
+      type: isBoss ? 'boss' : type,
       x: CANVAS_WIDTH + 50,
-      y: enemyY,
+      y: groundY - height,
       hp,
       maxHp: hp,
       facingLeft: true,
@@ -670,39 +564,18 @@ export class GameServer {
       weight: 0.2,
       groundY,
       attackTimer: 0,
-      attackInterval: isBoss ? 1500 : 2500,
-      projectiles: []
+      attackInterval: isBoss ? 1500 : 2500
     };
 
     this.enemies.push(enemy);
-
-    // Broadcast spawn event to clients
-    this.broadcastCallback({
-      ...this.getState(),
-      spawnedEnemy: {
-        id,
-        type: actualType,
-        x: enemy.x,
-        y: enemy.y,
-        hp,
-        maxHp: hp,
-        isBoss
-      }
-    } as any);
   }
 
   private updateEnemies() {
     this.enemies.forEach(e => {
       if (e.hp <= 0) {
         e.state = 'dead';
-        if (e.projectiles) {
-          e.projectiles = []; // clear projectiles if dead
-        }
         return;
       }
-
-      // Initialize projectiles array on server enemy if not present
-      if (!e.projectiles) e.projectiles = [];
 
       // Move toward closest player
       let targetPlayer: ServerPlayer | null = null;
@@ -721,8 +594,8 @@ export class GameServer {
         const toRight = tp.x > e.x;
         e.facingLeft = !toRight;
 
-        // Custom range: arcane archer has longer range
-        const attackRange = e.type === 'arcane_archer' ? 350 : (e.isBoss ? 120 : 60);
+        // Attack range
+        const attackRange = e.isBoss ? 120 : 60;
         if (minDist <= attackRange) {
           e.vx = 0;
           e.state = 'atk';
@@ -730,75 +603,14 @@ export class GameServer {
           e.attackTimer += TIME_STEP * 1000;
           if (e.attackTimer >= e.attackInterval) {
             e.attackTimer = 0;
-
-            // Handle projectile spawning or melee attack
-            if (e.type === 'arcane_archer') {
-              const fireX = e.facingLeft ? e.x : e.x + e.width;
-              const fireY = e.y + e.height * 0.4;
-              e.projectiles.push({
-                id: Math.random().toString(),
-                x: fireX,
-                y: fireY,
-                vx: e.facingLeft ? -8 : 8,
-                vy: 0,
-                type: 'ArcherProjectile',
-                damage: 8,
-                radius: 12
-              });
-            } else if (e.isBoss) {
-              const r = Math.random();
-              if (r < 0.4) {
-                // Fireball
-                const cx = e.x + e.width / 2;
-                const cy = e.y + e.height / 2;
-                const pvx = e.facingLeft ? -12 : 12;
-                e.projectiles.push({
-                  id: Math.random().toString(),
-                  x: cx,
-                  y: cy,
-                  vx: pvx,
-                  vy: 0,
-                  type: 'BossFireballProjectile',
-                  damage: 15,
-                  radius: 12
-                });
-              } else if (r < 0.8) {
-                // Giant fireball
-                const cx = e.x + e.width / 2;
-                const cy = e.y + e.height / 2;
-                const pvx = e.facingLeft ? -8 : 8;
-                e.projectiles.push({
-                  id: Math.random().toString(),
-                  x: cx,
-                  y: cy,
-                  vx: pvx,
-                  vy: 0,
-                  type: 'BossGiantFireball',
-                  damage: 25,
-                  radius: 24
-                });
-              } else {
-                // Melee slash or direct strike
-                if (!tp.shieldActive && tp.hitCooldown <= 0) {
-                  tp.hp = Math.max(0, tp.hp - 20);
-                  tp.animState = 'DAMAGE';
-                  tp.hitCooldown = 800;
-                  if (tp.hp <= 0) {
-                    tp.isDead = true;
-                    tp.animState = 'DEATH';
-                  }
-                }
-              }
-            } else {
-              // Melee damage to target
-              if (!tp.shieldActive && tp.hitCooldown <= 0) {
-                tp.hp = Math.max(0, tp.hp - 8);
-                tp.animState = 'DAMAGE';
-                tp.hitCooldown = 800;
-                if (tp.hp <= 0) {
-                  tp.isDead = true;
-                  tp.animState = 'DEATH';
-                }
+            // Deal damage to target
+            if (!tp.shieldActive && tp.hitCooldown <= 0) {
+              tp.hp -= e.isBoss ? 20 : 8;
+              tp.animState = 'DAMAGE';
+              tp.hitCooldown = 800;
+              if (tp.hp <= 0) {
+                tp.isDead = true;
+                tp.animState = 'DEATH';
               }
             }
           }
@@ -814,45 +626,10 @@ export class GameServer {
 
       e.x += e.vx;
       if (e.x < 0) e.x = 0;
-
-      // Update enemy's active projectiles and check player collisions
-      if (e.projectiles && e.projectiles.length > 0) {
-        e.projectiles.forEach((p: any) => {
-          p.x += p.vx;
-          p.y += p.vy;
-
-          // Check collisions with all players
-          this.players.forEach(tp => {
-            if (tp.isDead || tp.shieldActive || tp.hitCooldown > 0) return;
-            const dist = Math.hypot(tp.x + tp.width / 2 - p.x, tp.y + tp.height / 2 - p.y);
-            if (dist < p.radius + tp.width / 4) {
-              tp.hp = Math.max(0, tp.hp - p.damage);
-              tp.animState = 'DAMAGE';
-              tp.hitCooldown = 800;
-              p.x = -9999; // mark for deletion
-              if (tp.hp <= 0) {
-                tp.isDead = true;
-                tp.animState = 'DEATH';
-              }
-            }
-          });
-        });
-
-        // Filter out collided or offscreen projectiles
-        e.projectiles = e.projectiles.filter((p: any) => p.x > -200 && p.x < CANVAS_WIDTH + 200 && p.x !== -9999);
-      }
     });
 
     // Clean up dead enemies after 2 seconds
-    this.enemies = this.enemies.filter(e => {
-      if (e.hp <= 0) {
-        if (!(e as any).deathTime) {
-          (e as any).deathTime = Date.now();
-        }
-        return Date.now() - (e as any).deathTime < 2000;
-      }
-      return true;
-    });
+    this.enemies = this.enemies.filter(e => e.hp > 0 || e.state === 'dead');
   }
 
   private updateProjectiles() {

@@ -159,8 +159,6 @@ io.on('connection', (socket: Socket) => {
     const result = roomsManager.startGame(code, (state: GameState) => {
       // Logical ticks broadcast
       io.to(code).emit('gameState', state);
-      io.to(code).emit('gameStateUpdate', state);
-      io.to(code).emit('enemyStateUpdate', state.enemies);
     });
 
     if (typeof result === 'string') {
@@ -180,7 +178,7 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  // 6b. Capture client player state updates
+  // 6b. Capture client player state updates (client-authoritative coordinates)
   socket.on('playerStateUpdate', (playerState) => {
     const room = roomsManager.getRoomByPlayerId(playerId);
     if (room && room.gameInstance) {
@@ -188,11 +186,19 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  // 6c. Capture client enemy hits (authoritative HP reduction)
-  socket.on('enemyHit', ({ enemyId, damage }) => {
+  // 6c. Capture client enemy damage updates and route to room host
+  socket.on('enemyDamage', ({ enemyId, damage }) => {
     const room = roomsManager.getRoomByPlayerId(playerId);
-    if (room && room.gameInstance) {
-      room.gameInstance.handleEnemyHit(enemyId, damage, playerId);
+    if (room && room.hostId) {
+      const hostMember = room.members.get(room.hostId);
+      if (hostMember && hostMember.socketId) {
+        console.log(`Damage relayed from guest ${username} (${playerId}) to host for enemy ${enemyId}: ${damage}`);
+        io.to(hostMember.socketId).emit('applyEnemyDamage', { enemyId, damage });
+      } else {
+        console.log(`Failed to relay damage: host member or socketId not found in room.`);
+      }
+    } else {
+      console.log(`Failed to relay damage: room not found for player.`);
     }
   });
 
