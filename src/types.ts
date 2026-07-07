@@ -37,6 +37,7 @@ export interface EnemyState {
   facingLeft: boolean;
   state: string; // e.g. 'idle', 'walk', 'atk', 'hurt', 'dead'
   isBoss: boolean;
+  projectiles?: any[];
 }
 
 export interface ProjectileState {
