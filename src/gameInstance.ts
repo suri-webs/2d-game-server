@@ -863,7 +863,9 @@ export class GameInstance {
       status: this.status,
       winnerId: this.winnerId,
       waveIndex: this.waveIndex,
-      totalWaves: this.levelConfig.waves.length
+      totalWaves: this.levelConfig.waves.length,
+      cameraX: this.cameraX,
+      scrollSpeed: this.scrollSpeed
     };
   }
 }
