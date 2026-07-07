@@ -94,6 +94,8 @@ export interface GameState {
   timeRemaining?: number; // for timed final bosses/PVP rounds
   waveIndex?: number;
   totalWaves?: number;
+  cameraX?: number;
+  scrollSpeed?: number;
 }
 
 export interface RoomConfig {

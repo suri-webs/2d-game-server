@@ -19,6 +19,8 @@ interface ServerPlayer extends PlayerState {
   shieldTimer: number;
   hitCooldown: number;
   attackCooldown: number;
+  slashProjectiles?: any[];
+  windProjectiles?: any[];
 }
 
 interface ServerEnemy extends EnemyState {
@@ -49,6 +51,9 @@ export class GameInstance {
 
   private loopInterval: NodeJS.Timeout | null = null;
   private broadcastCallback: (state: GameState) => void;
+
+  private cameraX = 0;
+  private scrollSpeed = 0;
 
   // Wave manager states (Co-op only)
   private waveIndex = 0;
@@ -229,6 +234,9 @@ export class GameInstance {
       p.coins = state.coins;
       p.shieldActive = state.shieldActive;
       p.isDead = state.isDead;
+      // Relay player projectiles so other clients can render them
+      if (state.slashProjectiles !== undefined) p.slashProjectiles = state.slashProjectiles;
+      if (state.windProjectiles !== undefined) p.windProjectiles = state.windProjectiles;
     }
     if (playerId === this.hostId) {
       if (state.enemies) {
@@ -237,6 +245,8 @@ export class GameInstance {
       if (state.waveIndex !== undefined) this.waveIndex = state.waveIndex;
       if (state.waveSpawnedCount !== undefined) this.waveSpawnedCount = state.waveSpawnedCount;
       if (state.waveComplete !== undefined) this.waveComplete = state.waveComplete;
+      if (state.cameraX !== undefined) this.cameraX = state.cameraX;
+      if (state.scrollSpeed !== undefined) this.scrollSpeed = state.scrollSpeed;
       if (state.portalSpawned !== undefined) {
         this.portalSpawned = state.portalSpawned;
         if (state.portalSpawned && state.portalX !== undefined) {
@@ -244,6 +254,19 @@ export class GameInstance {
         } else {
           this.portal = null;
         }
+      }
+    }
+  }
+
+  public damagePlayer(playerId: string, damage: number) {
+    const p = this.players.get(playerId);
+    if (p && !p.isDead) {
+      p.hp = Math.max(0, p.hp - damage);
+      p.animState = 'DAMAGE';
+      p.hitCooldown = 800;
+      if (p.hp <= 0) {
+        p.isDead = true;
+        p.animState = 'DEATH';
       }
     }
   }
@@ -791,7 +814,7 @@ export class GameInstance {
   private getState(): GameState {
     const playersState: { [id: string]: PlayerState } = {};
     this.players.forEach((p, id) => {
-      playersState[id] = {
+      const pState: any = {
         id: p.id,
         username: p.username,
         characterType: p.characterType,
@@ -809,6 +832,10 @@ export class GameInstance {
         isDead: p.isDead,
         score: p.score
       };
+      // Pass through player projectiles for remote rendering
+      if (p.slashProjectiles) pState.slashProjectiles = p.slashProjectiles;
+      if (p.windProjectiles) pState.windProjectiles = p.windProjectiles;
+      playersState[id] = pState;
     });
 
     return {
