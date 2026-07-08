@@ -219,6 +219,75 @@ io.on('connection', (socket: Socket) => {
     });
   });
 
+  // ==========================================
+  // WebRTC VOICE CHAT SIGNALING
+  // ==========================================
+  
+  socket.on('voice-offer', (data) => {
+    // Relay offer to the specific target player
+    const room = roomsManager.getRoomByPlayerId(playerId);
+    if (room) {
+      const targetMember = room.members.get(data.target);
+      if (targetMember && targetMember.socketId) {
+        io.to(targetMember.socketId).emit('voice-offer', {
+          sender: playerId,
+          offer: data.offer
+        });
+      }
+    }
+  });
+
+  socket.on('voice-answer', (data) => {
+    // Relay answer to the specific target player
+    const room = roomsManager.getRoomByPlayerId(playerId);
+    if (room) {
+      const targetMember = room.members.get(data.target);
+      if (targetMember && targetMember.socketId) {
+        io.to(targetMember.socketId).emit('voice-answer', {
+          sender: playerId,
+          answer: data.answer
+        });
+      }
+    }
+  });
+
+  socket.on('voice-ice-candidate', (data) => {
+    // Relay ICE candidate to the specific target player
+    const room = roomsManager.getRoomByPlayerId(playerId);
+    if (room) {
+      const targetMember = room.members.get(data.target);
+      if (targetMember && targetMember.socketId) {
+        io.to(targetMember.socketId).emit('voice-ice-candidate', {
+          sender: playerId,
+          candidate: data.candidate
+        });
+      }
+    }
+  });
+
+  socket.on('voice-toggle', (data) => {
+    // Broadcast mute/unmute state to everyone else in the room
+    const room = roomsManager.getRoomByPlayerId(playerId);
+    if (room) {
+      socket.to(room.code).emit('voice-toggle', {
+        sender: playerId,
+        isMuted: data.isMuted
+      });
+    }
+  });
+
+  socket.on('voice-volume', (data) => {
+    // Broadcast volume levels (for VAD UI indicators) to everyone else in the room
+    const room = roomsManager.getRoomByPlayerId(playerId);
+    if (room) {
+      socket.to(room.code).emit('voice-volume', {
+        sender: playerId,
+        volume: data.volume,
+        isSpeaking: data.isSpeaking
+      });
+    }
+  });
+
   // 8. Leave room manually
   socket.on('leaveRoom', () => {
     handlePlayerLeaving(socket, playerId);
@@ -256,3 +325,5 @@ httpServer.listen(PORT, () => {
 });
 
 // Trigger compile restart
+
+// Restart trigger
