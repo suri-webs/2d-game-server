@@ -143,7 +143,7 @@ export class RoomsManager {
   public startGame(code: string, broadcastCallback: (state: any) => void): Room | string {
     const room = this.rooms.get(code.toUpperCase());
     if (!room) return 'Room not found.';
-    if (room.status !== 'lobby') return 'Game already started.';
+    if (room.status === 'playing') return 'Game already started.';
 
     room.status = 'playing';
     room.gameInstance = new GameInstance(code, room.mode, room.level, room.hostId, broadcastCallback);
