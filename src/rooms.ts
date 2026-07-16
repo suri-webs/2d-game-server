@@ -157,6 +157,27 @@ export class RoomsManager {
     return room;
   }
 
+  public nextLevel(code: string, broadcastCallback: (state: any) => void): Room | string {
+    const room = this.rooms.get(code.toUpperCase());
+    if (!room) return 'Room not found.';
+    
+    room.level++;
+    
+    if (room.gameInstance) {
+      room.gameInstance.stop();
+    }
+    
+    room.status = 'playing';
+    room.gameInstance = new GameInstance(code, room.mode, room.level, room.hostId, broadcastCallback);
+    
+    room.members.forEach(m => {
+      room.gameInstance!.addPlayer(m.playerId, m.username, m.characterType);
+    });
+
+    room.gameInstance.start();
+    return room;
+  }
+
   public getRoomByPlayerId(playerId: string): Room | undefined {
     for (const room of this.rooms.values()) {
       if (room.members.has(playerId)) {

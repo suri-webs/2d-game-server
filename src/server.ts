@@ -170,6 +170,25 @@ io.on('connection', (socket: Socket) => {
     callback({ success: true });
   });
 
+  // 5b. Host proceeds to next level
+  socket.on('nextLevel', ({ code }, callback) => {
+    const room = roomsManager.getRoom(code);
+    if (!room) return callback({ success: false, error: 'Room not found.' });
+    if (room.hostId !== playerId) return callback({ success: false, error: 'Only the host can start the next level.' });
+
+    const result = roomsManager.nextLevel(code, (state: GameState) => {
+      io.to(code).emit('gameState', state);
+    });
+
+    if (typeof result === 'string') {
+      return callback({ success: false, error: result });
+    }
+
+    console.log(`Next level started in room ${code}, level: ${room.level}`);
+    io.to(code).emit('gameStarted', { level: room.level, mode: room.mode });
+    callback({ success: true });
+  });
+
   // 6. Capture client inputs during matches
   socket.on('input', (inputState) => {
     const room = roomsManager.getRoomByPlayerId(playerId);
