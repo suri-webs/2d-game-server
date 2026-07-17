@@ -113,7 +113,7 @@ export class GameInstance {
     }
 
     this.levelConfig = {
-      groundMargin: 55,
+      groundMargin: (lvl === 1 || lvl === 11) ? 45 : 55,
       enemyInterval: 2000 - Math.min(10, lvl) * 100,
       waves: waves
     };
