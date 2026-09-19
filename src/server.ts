@@ -43,6 +43,14 @@ const roomsManager = new RoomsManager();
 
 // Auth Middleware for Socket.IO connections
 io.use((socket: Socket, next) => {
+  const highestUnlockedLevel = Number(socket.handshake.auth?.highestUnlockedLevel || 1);
+
+  if (highestUnlockedLevel < 20) {
+    const err = new Error("You must complete Story Mode before joining Multiplayer.") as any;
+    err.data = { code: 'LEVEL_NOT_UNLOCKED' };
+    return next(err);
+  }
+
   const token = socket.handshake.auth?.token;
 
   if (token) {
